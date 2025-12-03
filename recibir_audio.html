@@ -78,7 +78,7 @@
     }
 
     startBtn.onclick = async () => {
-      ws = new WebSocket('ws://192.168.1.129:8080'); // ip de la maquina donde se ejecuta el websokcet
+      ws = new WebSocket('ws://192.168.1.153:80'); // ip de la maquina donde se ejecuta el websokcet
       ws.binaryType = 'arraybuffer';            
 
       ws.onopen = async () => {
