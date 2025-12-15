@@ -1,12 +1,11 @@
-const { WebSocketServer } = require('ws'); 
 const express = require("express");
+const http = require("http");
+const { WebSocketServer } = require("ws");
 
 const app = express();
-const HTTP_PORT = 3000;
-
 app.use(express.json());
 
-// --- ENDPOINT EXISTENTE 1: CREAR ---
+// ===== API REST =====
 app.post("/broadcast/incidente", (req, res) => {
   const incidente = req.body;
   console.log("Incidente recibido:", incidente);
@@ -14,71 +13,58 @@ app.post("/broadcast/incidente", (req, res) => {
   res.json({ success: true });
 });
 
-// --- ENDPOINT EXISTENTE 2: ASIGNAR ---
 app.post("/broadcast/asignacion-ambulancia", (req, res) => {
   const payload = req.body;
   console.log("Asignación enviada:", payload);
-  broadcast(payload); // El payload ya trae la estructura { event, data } desde Laravel
+  broadcast(payload);
   res.json({ success: true });
 });
 
-// --- NUEVO ENDPOINT 3: ACTUALIZAR DATOS (AGREGA ESTO) ---
-// ... (Tus imports y configuraciones previas)
-
 app.post("/broadcast/incidente-actualizado", (req, res) => {
-  // req.body es el objeto COMPLETO del incidente que mandó Laravel
-  const incidenteCompleto = req.body; 
+  const incidenteCompleto = req.body;
 
   console.log("Actualización recibida. ID:", incidenteCompleto.id);
   console.log("Datos nuevos (ejemplo):", incidenteCompleto.descripcion);
   console.log("--- ACTUALIZACIÓN COMPLETA RECIBIDA ---");
-  console.dir(incidenteCompleto, { depth: null, colors: true }); // Para que verifiques en consola
+  console.dir(incidenteCompleto, { depth: null, colors: true });
 
-  // Enviamos todo a la App
-  broadcast({ 
-      event: "incidente.actualizado", 
-      data: incidenteCompleto // <--- AQUÍ VA TODO EL MODELO
+  broadcast({
+    event: "incidente.actualizado",
+    data: incidenteCompleto
   });
 
   res.json({ success: true, message: "Datos actualizados enviados" });
 });
 
-// Función broadcast (ya la tenías, la pongo por referencia)
-function broadcast(jsonData) {
-  clients.forEach(client => {
-    if (client.readyState === 1) {
-      client.send(JSON.stringify(jsonData));
-    }
-  });
-}
+// ===== HTTP SERVER =====
+const server = http.createServer(app);
 
-// ... (Resto del servidor)
-
-// --- FUNCIÓN HELPER PARA NO REPETIR CÓDIGO ---
-function broadcast(jsonData) {
-  clients.forEach(client => {
-    if (client.readyState === 1) {
-      client.send(JSON.stringify(jsonData));
-    }
-  });
-}
-
-app.listen(HTTP_PORT, () => {
-    console.log(`API REST escuchando en http://localhost:${HTTP_PORT}`);
-});
-
-// ... (El resto de tu código del WebSocketServer se queda igual) ...
-const wss = new WebSocketServer({ port: 8080 });
+// ===== WEBSOCKET =====
+const wss = new WebSocketServer({ server });
 let clients = [];
 
-wss.on('connection', (ws) => {
-  console.log('Cliente conectado');
+wss.on("connection", (ws) => {
+  console.log("Cliente conectado");
   clients.push(ws);
-  
-  // Opcional: Manejo de ping/pong para mantener viva la conexión
-  ws.on('close', () => {
+
+  ws.on("close", () => {
     clients = clients.filter(c => c !== ws);
   });
 });
 
-console.log('Servidor WebSocket activo en ws://localhost:8080');
+// ===== BROADCAST (una sola vez) =====
+function broadcast(jsonData) {
+  const msg = JSON.stringify(jsonData);
+  clients.forEach(client => {
+    if (client.readyState === client.OPEN) {
+      client.send(msg);
+    }
+  });
+}
+
+// ===== START =====
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+  console.log(`API REST escuchando en http://localhost:${PORT}`);
+  console.log(`Servidor WebSocket activo en ws://localhost:${PORT}`);
+});
